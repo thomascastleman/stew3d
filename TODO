@@ -1,0 +1,8 @@
+
+Jobs for the profiler:
+    [] disassembler
+    [] count # of instrs
+    [] count # of immediates
+    [] breakdown % opcodes vs % immediates
+    [] breakdown of % of single-byte instrs, two-byte instrs, etc
+    [] top 5 most common instrs (or instr sequences?)
