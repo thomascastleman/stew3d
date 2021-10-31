@@ -1,263 +1,8 @@
-use std::convert::TryFrom;
-
-const OPCODE_MIN: u8 = 0x00;
-const OPCODE_MAX: u8 = 0xc8;
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Opcode {
-    ADD_A_A = OPCODE_MIN,
-    ADD_A_B,
-    ADD_A_C,
-    ADD_A_SP,
-    ADD_B_A,
-    ADD_B_B,
-    ADD_B_C,
-    ADD_B_SP,
-    ADD_C_A,
-    ADD_C_B,
-    ADD_C_C,
-    ADD_C_SP,
-
-    ADDI_A,
-    ADDI_B,
-    ADDI_C,
-    ADDI_SP,
-
-    ADDC_A_A,
-    ADDC_A_B,
-    ADDC_A_C,
-    ADDC_A_SP,
-    ADDC_B_A,
-    ADDC_B_B,
-    ADDC_B_C,
-    ADDC_B_SP,
-    ADDC_C_A,
-    ADDC_C_B,
-    ADDC_C_C,
-    ADDC_C_SP,
-
-    ADDCI_A,
-    ADDCI_B,
-    ADDCI_C,
-    ADDCI_SP,
-
-    SUB_B_A,
-    SUB_C_A,
-    SUB_A_B,
-    SUB_C_B,
-    SUB_A_C,
-    SUB_B_C,
-    SUB_A_SP,
-    SUB_B_SP,
-    SUB_C_SP,
-
-    SUBI_A,
-    SUBI_B,
-    SUBI_C,
-    SUBI_SP,
-
-    SUBB_B_A,
-    SUBB_C_A,
-    SUBB_A_B,
-    SUBB_C_B,
-    SUBB_A_C,
-    SUBB_B_C,
-    SUBB_A_SP,
-    SUBB_B_SP,
-    SUBB_C_SP,
-
-    SUBBI_A,
-    SUBBI_B,
-    SUBBI_C,
-    SUBBI_SP,
-
-    AND_B_A,
-    AND_C_A,
-    AND_A_B,
-    AND_C_B,
-    AND_A_C,
-    AND_B_C,
-
-    ANI_A,
-    ANI_B,
-    ANI_C,
-
-    OR_B_A,
-    OR_C_A,
-    OR_A_B,
-    OR_C_B,
-    OR_A_C,
-    OR_B_C,
-
-    ORI_A,
-    ORI_B,
-    ORI_C,
-
-    XOR_B_A,
-    XOR_C_A,
-    XOR_A_B,
-    XOR_C_B,
-    XOR_A_C,
-    XOR_B_C,
-
-    XRI_A,
-    XRI_B,
-    XRI_C,
-
-    NOT_A,
-    NOT_B,
-    NOT_C,
-
-    NEG_A,
-    NEG_B,
-    NEG_C,
-
-    INR_A,
-    INR_B,
-    INR_C,
-    INR_SP,
-
-    INR2_A,
-    INR2_B,
-    INR2_C,
-    INR2_SP,
-
-    INR3_A,
-    INR3_B,
-    INR3_C,
-    INR3_SP,
-
-    DCR_A,
-    DCR_B,
-    DCR_C,
-    DCR_SP,
-
-    DCR2_A,
-    DCR2_B,
-    DCR2_C,
-    DCR2_SP,
-
-    DCR3_A,
-    DCR3_B,
-    DCR3_C,
-    DCR3_SP,
-
-    MOV_A_B,
-    MOV_A_C,
-    MOV_B_A,
-    MOV_B_C,
-    MOV_C_A,
-    MOV_C_B,
-    MOV_Z_A,
-    MOV_Z_B,
-    MOV_Z_C,
-    MOV_SP_A,
-    MOV_SP_B,
-    MOV_SP_C,
-
-    MVI_A,
-    MVI_B,
-    MVI_C,
-
-    LD_A_A,
-    LD_B_A,
-    LD_C_A,
-    LD_A_B,
-    LD_B_B,
-    LD_C_B,
-    LD_A_C,
-    LD_B_C,
-    LD_C_C,
-
-    ST_A_A,
-    ST_A_B,
-    ST_A_C,
-    ST_B_A,
-    ST_B_B,
-    ST_B_C,
-    ST_C_A,
-    ST_C_B,
-    ST_C_C,
-    ST_Z_A,
-    ST_Z_B,
-    ST_Z_C,
-
-    LDS_A,
-    LDS_B,
-    LDS_C,
-
-    STS_A,
-    STS_B,
-    STS_C,
-    STS_Z,
-
-    STSI,
-
-    CMP_A_B,
-    CMP_A_C,
-    CMP_A_Z,
-    CMP_B_A,
-    CMP_B_C,
-    CMP_B_Z,
-    CMP_C_A,
-    CMP_C_B,
-    CMP_C_Z,
-    CMP_Z_A,
-    CMP_Z_B,
-    CMP_Z_C,
-
-    CMPI_A_BYTE,
-    CMPI_BYTE_A,
-    CMPI_B_BYTE,
-    CMPI_BYTE_B,
-    CMPI_C_BYTE,
-    CMPI_BYTE_C,
-
-    JMP,
-    JE,
-    JNE,
-    JG,
-    JGE,
-    JL,
-    JLE,
-    JA,
-    JAE,
-    JB,
-    JBE,
-    CALL,
-    RET,
-
-    OUT_A,
-    OUT_B,
-    OUT_C,
-
-    OUTI,
-    DIC,
-    DID,
-
-    DD_A,
-    DD_B,
-    DD_C,
-
-    HLT,
-    NOP = OPCODE_MAX,
-}
-
-impl TryFrom<u8> for Opcode {
-    type Error = crate::Error;
-
-    fn try_from(byte: u8) -> Result<Self, Self::Error> {
-        match byte {
-            OPCODE_MIN..=OPCODE_MAX => {
-                // SAFETY: The byte is within the valid range of opcodes.
-                Ok(unsafe { std::mem::transmute(byte) })
-            }
-            _ => Err(crate::Error::InvalidOpcode(byte)),
-        }
-    }
-}
+use crate::Opcode;
+use std::fmt;
+use Instruction::*;
+use Opcode::*;
+use Operands::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Operands {
@@ -268,7 +13,305 @@ pub enum Operands {
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    Label(u8, String),
-    Jump(Opcode, u8, String),
-    Instr(Opcode, Operands),
+    /// address, name
+    Label(usize, String),
+    /// address, opcode, target address, target label
+    Jump(usize, Opcode, u8, String),
+    /// address, opcode, operands
+    Instr(usize, Opcode, Operands),
+}
+
+impl Instruction {
+    /// Extracts the address in the binary of a given instruction. Labels, jumps
+    /// and other instructions all have this component, so this is defined
+    /// for any instruction.
+    pub fn addr(&self) -> usize {
+        match self {
+            Label(addr, _) | Jump(addr, _, _, _) | Instr(addr, _, _) => *addr,
+        }
+    }
+
+    /// Convert an instruction into the sequence of bytes used to represent it.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            Label(_, _) => Vec::new(),
+            Jump(_, op, target, _) => vec![*op as u8, *target],
+            Instr(_, op, operands) => {
+                let op = *op as u8;
+                match operands {
+                    Zero => vec![op],
+                    One(first) => vec![op, *first],
+                    Two(first, second) => vec![op, *first, *second],
+                }
+            }
+        }
+    }
+}
+
+/// The tab character that is used to indent instructions in the disassembly.
+const TAB: &str = "  ";
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Label(_, name) => write!(f, "{}:", name),
+            Jump(_, op, _, target) => {
+                let jmp = match op {
+                    JMP => "jmp",
+                    JE => "je",
+                    JNE => "jne",
+                    JG => "jg",
+                    JGE => "jge",
+                    JL => "jl",
+                    JLE => "jle",
+                    JA => "ja",
+                    JAE => "jae",
+                    JB => "jb",
+                    JBE => "jbe",
+                    CALL => "call",
+                    _ => unreachable!(),
+                };
+                write!(f, "{}{} {}", TAB, jmp, target)
+            }
+            Instr(_, op, operands) => {
+                let str = match operands {
+                    Zero => match op {
+                        ADD_A_A => "add a, a",
+                        ADD_A_B => "add a, b",
+                        ADD_A_C => "add a, c",
+                        ADD_A_SP => "add a, sp",
+                        ADD_B_A => "add b, a",
+                        ADD_B_B => "add b, b",
+                        ADD_B_C => "add b, c",
+                        ADD_B_SP => "add b, sp",
+                        ADD_C_A => "add c, a",
+                        ADD_C_B => "add c, b",
+                        ADD_C_C => "add c, c",
+                        ADD_C_SP => "add c, sp",
+
+                        ADDC_A_A => "addc a, a",
+                        ADDC_A_B => "addc a, b",
+                        ADDC_A_C => "addc a, c",
+                        ADDC_A_SP => "addc a, sp",
+                        ADDC_B_A => "addc b, a",
+                        ADDC_B_B => "addc b, b",
+                        ADDC_B_C => "addc b, c",
+                        ADDC_B_SP => "addc b, sp",
+                        ADDC_C_A => "addc c, a",
+                        ADDC_C_B => "addc c, b",
+                        ADDC_C_C => "addc c, c",
+                        ADDC_C_SP => "addc c, sp",
+
+                        SUB_B_A => "sub b, a",
+                        SUB_C_A => "sub c, a",
+                        SUB_A_B => "sub a, b",
+                        SUB_C_B => "sub c, b",
+                        SUB_A_C => "sub a, c",
+                        SUB_B_C => "sub b, c",
+                        SUB_A_SP => "sub a, sp",
+                        SUB_B_SP => "sub b, sp",
+                        SUB_C_SP => "sub c, sp",
+
+                        SUBB_B_A => "subb b, a",
+                        SUBB_C_A => "subb c, a",
+                        SUBB_A_B => "subb a, b",
+                        SUBB_C_B => "subb c, b",
+                        SUBB_A_C => "subb a, c",
+                        SUBB_B_C => "subb b, c",
+                        SUBB_A_SP => "subb a, sp",
+                        SUBB_B_SP => "subb b, sp",
+                        SUBB_C_SP => "subb c, sp",
+
+                        AND_B_A => "and b, a",
+                        AND_C_A => "and c, a",
+                        AND_A_B => "and a, b",
+                        AND_C_B => "and c, b",
+                        AND_A_C => "and a, c",
+                        AND_B_C => "and b, c",
+
+                        OR_B_A => "or b, a",
+                        OR_C_A => "or c, a",
+                        OR_A_B => "or a, b",
+                        OR_C_B => "or c, b",
+                        OR_A_C => "or a, c",
+                        OR_B_C => "or b, c",
+
+                        XOR_B_A => "xor b, a",
+                        XOR_C_A => "xor c, a",
+                        XOR_A_B => "xor a, b",
+                        XOR_C_B => "xor c, b",
+                        XOR_A_C => "xor a, c",
+                        XOR_B_C => "xor b, c",
+
+                        NOT_A => "not a",
+                        NOT_B => "not b",
+                        NOT_C => "not c",
+
+                        NEG_A => "neg a",
+                        NEG_B => "neg b",
+                        NEG_C => "neg c",
+
+                        INR_A => "inr a",
+                        INR_B => "inr b",
+                        INR_C => "inr c",
+                        INR_SP => "inr sp",
+
+                        INR2_A => "inr2 a",
+                        INR2_B => "inr2 b",
+                        INR2_C => "inr2 c",
+                        INR2_SP => "inr2 sp",
+
+                        INR3_A => "inr3 a",
+                        INR3_B => "inr3 b",
+                        INR3_C => "inr3 c",
+                        INR3_SP => "inr3 sp",
+
+                        DCR_A => "dcr a",
+                        DCR_B => "dcr b",
+                        DCR_C => "dcr c",
+                        DCR_SP => "dcr sp",
+
+                        DCR2_A => "dcr2 a",
+                        DCR2_B => "dcr2 b",
+                        DCR2_C => "dcr2 c",
+                        DCR2_SP => "dcr2 sp",
+
+                        DCR3_A => "dcr3 a",
+                        DCR3_B => "dcr3 b",
+                        DCR3_C => "dcr3 c",
+                        DCR3_SP => "dcr3 sp",
+
+                        MOV_A_B => "mov a, b",
+                        MOV_A_C => "mov a, c",
+                        MOV_B_A => "mov b, a",
+                        MOV_B_C => "mov b, c",
+                        MOV_C_A => "mov c, a",
+                        MOV_C_B => "mov c, b",
+                        MOV_Z_A => "mov z, a",
+                        MOV_Z_B => "mov z, b",
+                        MOV_Z_C => "mov z, c",
+                        MOV_SP_A => "mov sp, a",
+                        MOV_SP_B => "mov sp, b",
+                        MOV_SP_C => "mov sp, c",
+
+                        LD_A_A => "ld a, a",
+                        LD_B_A => "ld b, a",
+                        LD_C_A => "ld c, a",
+                        LD_A_B => "ld a, b",
+                        LD_B_B => "ld b, b",
+                        LD_C_B => "ld c, b",
+                        LD_A_C => "ld a, c",
+                        LD_B_C => "ld b, c",
+                        LD_C_C => "ld c, c",
+
+                        ST_A_A => "st a, a",
+                        ST_A_B => "st a, b",
+                        ST_A_C => "st a, c",
+                        ST_B_A => "st b, a",
+                        ST_B_B => "st b, b",
+                        ST_B_C => "st b, c",
+                        ST_C_A => "st c, a",
+                        ST_C_B => "st c, b",
+                        ST_C_C => "st c, c",
+                        ST_Z_A => "st z, a",
+                        ST_Z_B => "st z, b",
+                        ST_Z_C => "st z, c",
+
+                        CMP_A_B => "cmp a, b",
+                        CMP_A_C => "cmp a, c",
+                        CMP_A_Z => "cmp a, z",
+                        CMP_B_A => "cmp b, a",
+                        CMP_B_C => "cmp b, c",
+                        CMP_B_Z => "cmp b, z",
+                        CMP_C_A => "cmp c, a",
+                        CMP_C_B => "cmp c, b",
+                        CMP_C_Z => "cmp c, z",
+                        CMP_Z_A => "cmp z, a",
+                        CMP_Z_B => "cmp z, b",
+                        CMP_Z_C => "cmp z, c",
+
+                        RET => "ret",
+
+                        OUT_A => "out a",
+                        OUT_B => "out b",
+                        OUT_C => "out c",
+
+                        DD_A => "dd a",
+                        DD_B => "dd b",
+                        DD_C => "dd c",
+
+                        HLT => "hlt",
+                        NOP => "nop",
+
+                        _ => unreachable!(),
+                    }
+                    .into(),
+                    One(first) => match op {
+                        ADDI_A => format!("addi {}, a", first),
+                        ADDI_B => format!("addi {}, b", first),
+                        ADDI_C => format!("addi {}, c", first),
+                        ADDI_SP => format!("addi {}, sp", first),
+
+                        ADDCI_A => format!("addci {}, a", first),
+                        ADDCI_B => format!("addci {}, b", first),
+                        ADDCI_C => format!("addci {}, c", first),
+                        ADDCI_SP => format!("addci {}, sp", first),
+
+                        SUBI_A => format!("subi {}, a", first),
+                        SUBI_B => format!("subi {}, b", first),
+                        SUBI_C => format!("subi {}, c", first),
+                        SUBI_SP => format!("subi {}, sp", first),
+
+                        SUBBI_A => format!("subbi {}, a", first),
+                        SUBBI_B => format!("subbi {}, b", first),
+                        SUBBI_C => format!("subbi {}, c", first),
+                        SUBBI_SP => format!("subbi {}, sp", first),
+
+                        ANI_A => format!("ani {}, a", first),
+                        ANI_B => format!("ani {}, b", first),
+                        ANI_C => format!("ani {}, c", first),
+
+                        ORI_A => format!("ori {}, a", first),
+                        ORI_B => format!("ori {}, b", first),
+                        ORI_C => format!("ori {}, c", first),
+
+                        XRI_A => format!("xri {}, a", first),
+                        XRI_B => format!("xri {}, b", first),
+                        XRI_C => format!("xri {}, c", first),
+
+                        MVI_A => format!("mvi {}, a", first),
+                        MVI_B => format!("mvi {}, b", first),
+                        MVI_C => format!("mvi {}, c", first),
+
+                        LDS_A => format!("lds {}, a", first),
+                        LDS_B => format!("lds {}, b", first),
+                        LDS_C => format!("lds {}, c", first),
+
+                        STS_A => format!("sts a, {}", first),
+                        STS_B => format!("sts b, {}", first),
+                        STS_C => format!("sts c, {}", first),
+                        STS_Z => format!("sts z, {}", first),
+
+                        CMPI_A_BYTE => format!("cmpi a, {}", first),
+                        CMPI_BYTE_A => format!("cmpi {}, a", first),
+                        CMPI_B_BYTE => format!("cmpi b, {}", first),
+                        CMPI_BYTE_B => format!("cmpi {}, b", first),
+                        CMPI_C_BYTE => format!("cmpi c, {}", first),
+                        CMPI_BYTE_C => format!("cmpi {}, c", first),
+
+                        OUTI => format!("outi {}", first),
+                        DIC => format!("dic {}", first),
+                        DID => format!("did {}", first),
+                        _ => unreachable!(),
+                    },
+                    Two(first, second) => match op {
+                        STSI => format!("stsi {}, {}", first, second),
+                        _ => unreachable!(),
+                    },
+                };
+
+                write!(f, "{}{}", TAB, str)
+            }
+        }
+    }
 }

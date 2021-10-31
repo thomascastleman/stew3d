@@ -1,9 +1,10 @@
 [package]
-name = "s3prof"
+name = "stew3d"
 version = "0.1.0"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Thomas Castleman <thomascastleman0@gmail.com>"]
+description = "A disassembler for the Stew 3000"
 
 [dependencies]
 bimap = "0.6.1"
+structopt = "0.3.25"

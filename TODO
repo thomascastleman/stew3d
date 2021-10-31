@@ -1,4 +1,6 @@
 
+[] use an error handling crate like anyhow
+
 Jobs for the profiler:
     [] disassembler
     [] count # of instrs

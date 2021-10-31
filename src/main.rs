@@ -1,27 +1,55 @@
 use bimap::BiMap;
 use instr::Instruction::{self, *};
-use instr::Opcode::{self, *};
 use instr::Operands::*;
+use opcode::InstrSize;
+use opcode::Opcode::{self, *};
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::{self, Read};
+use structopt::StructOpt;
 
 mod instr;
+mod opcode;
 
-fn main() -> io::Result<()> {
-    // TODO: take this as CLI arg
-    let filename = "data/multiple-labels.3000.b";
+#[derive(StructOpt, Debug)]
+#[structopt(name = "stew3d")]
+struct Opt {
+    #[structopt(name = "FILE")]
+    file: String,
+}
 
-    let mut f = File::open(filename)?;
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> io::Result<()> {
+    let opt = Opt::from_args();
+    let filename = opt.file;
+
+    let mut f = File::open(&filename)?;
     let mut buffer = Vec::new();
     let file_size = f.read_to_end(&mut buffer)?;
 
-    println!("file is {} bytes", file_size);
+    println!(
+        "\nDisassembly of file `{}` ({} bytes)\n",
+        &filename, file_size
+    );
 
     match parse(&buffer) {
         Err(e) => eprintln!("{:?}", e),
         Ok(instrs) => {
-            println!("{:#?}", instrs);
+            for ins in instrs {
+                let bytes_str = ins
+                    .to_bytes()
+                    .iter()
+                    .map(|b| format!("{:02x}", b))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                println!("{:02x}: {:8} | {}", ins.addr(), bytes_str, ins);
+            }
         }
     };
 
@@ -52,11 +80,13 @@ fn parse(bytes: &[u8]) -> Result<Vec<Instruction>, Error> {
     let mut instrs = Vec::new();
 
     // This map maintains a bidirectional correspondence between addresses and labels
-    let mut label_addr_map: BiMap<u8, String> = BiMap::new();
+    let mut label_addr_map: BiMap<usize, String> = BiMap::new();
+
+    let mut addr = 0; // current address in binary
 
     while let Some(&opcode) = bytes.next() {
         let opcode: Opcode = opcode.try_into()?;
-        let size = size_from_opcode(opcode)?;
+        let size = opcode.size_of_ins()?;
 
         // Expect another byte in the input stream and error with unexpected
         // end of input if no more bytes.
@@ -64,7 +94,7 @@ fn parse(bytes: &[u8]) -> Result<Vec<Instruction>, Error> {
 
         let ins = match size {
             // opcode + no operands
-            InstrSize::OneByte => Instr(opcode, Zero),
+            InstrSize::OneByte => Instr(addr, opcode, Zero),
             // opcode + single operand
             InstrSize::TwoByte => {
                 let operand = *expect_operand()?;
@@ -73,99 +103,49 @@ fn parse(bytes: &[u8]) -> Result<Vec<Instruction>, Error> {
                     // If the instruction is a jump (needs labelss)
                     JMP | JE | JNE | JL | JLE | JG | JGE | JA | JAE | JB | JBE | CALL => {
                         // Check map for label already generated for this address
-                        match label_addr_map.get_by_left(&operand) {
-                            Some(label) => Jump(opcode, operand, label.clone()),
+                        match label_addr_map.get_by_left(&(operand as usize)) {
+                            Some(label) => Jump(addr, opcode, operand, label.clone()),
                             None => {
                                 // No label for this address, generate a new one and
                                 // insert it into the map.
                                 let new_label = gensym("l");
-                                label_addr_map.insert(operand, new_label.clone());
-                                Jump(opcode, operand, new_label.clone())
+                                label_addr_map.insert(operand as usize, new_label.clone());
+                                Jump(addr, opcode, operand, new_label.clone())
                             }
                         }
                     }
-                    _ => Instr(opcode, One(operand)),
+                    _ => Instr(addr, opcode, One(operand)),
                 }
             }
             // opcode + two operands
             InstrSize::ThreeByte => {
                 let operand1 = *expect_operand()?;
                 let operand2 = *expect_operand()?;
-                Instr(opcode, Two(operand1, operand2))
+                Instr(addr, opcode, Two(operand1, operand2))
             }
         };
 
         instrs.push(ins);
+        addr += size.to_number();
     }
 
-    let mut addr = 0;
+    let mut addr: usize = 0;
     let mut with_labels = Vec::with_capacity(instrs.len());
     for ins in &instrs {
         // If a label points at this address, add one
         if let Some(label) = label_addr_map.get_by_left(&addr) {
-            with_labels.push(Label(addr, label.clone()));
+            with_labels.push(Label(addr as usize, label.clone()));
         }
 
         let opcode = match ins {
-            Jump(opcode, _, _) => opcode,
-            Instr(opcode, _) => opcode,
-            _ => panic!("TODO: unreachable arm"),
+            Jump(_, opcode, _, _) => opcode,
+            Instr(_, opcode, _) => opcode,
+            _ => unreachable!(),
         };
 
-        addr += match size_from_opcode(*opcode)? {
-            InstrSize::OneByte => 1,
-            InstrSize::TwoByte => 2,
-            InstrSize::ThreeByte => 3,
-        };
-
+        addr += opcode.size_of_ins()?.to_number();
         with_labels.push(ins.clone());
     }
 
     Ok(with_labels)
-}
-
-enum InstrSize {
-    OneByte,
-    TwoByte,
-    ThreeByte,
-}
-
-/// Determines the size of an instruction, given its opcode.
-fn size_from_opcode(opcode: Opcode) -> Result<InstrSize, Error> {
-    match opcode as u8 {
-        // add, addc, sub, subb, and, or, xor, not, neg, inr, inr2, inr3,
-        // dcr, dcr2, dcr3, mov, ld, st, cmp, ret, out, dd, hlt, nop
-        0x00..=0x0b
-        | 0x10..=0x1b
-        | 0x20..=0x28
-        | 0x2d..=0x35
-        | 0x3a..=0x3f
-        | 0x43..=0x48
-        | 0x4c..=0x51
-        | 0x55..=0x7e
-        | 0x82..=0x96
-        | 0x9f..=0xaa
-        | 0xbd..=0xc0
-        | 0xc4..=0xc8 => Ok(InstrSize::OneByte),
-
-        // addi, addci, subi, subbi, ani, ori, xri, mvi, lds, sts, cmpi,
-        // jmp, je, jne, jg, jge, jl, jle, ja, jae, jb, jbe, call, outi,
-        // dic, did,
-        0x0c..=0x0f
-        | 0x1c..=0x1f
-        | 0x29..=0x2c
-        | 0x36..=0x39
-        | 0x40..=0x42
-        | 0x49..=0x4b
-        | 0x52..=0x54
-        | 0x7f..=0x81
-        | 0x97..=0x9d
-        | 0xab..=0xbc
-        | 0xc1..=0xc3 => Ok(InstrSize::TwoByte),
-
-        // stsi
-        0x9e => Ok(InstrSize::ThreeByte),
-
-        opcode => Err(Error::InvalidOpcode(opcode)),
-    }
 }
