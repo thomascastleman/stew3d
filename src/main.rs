@@ -14,8 +14,13 @@ mod opcode;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "stew3d")]
 struct Opt {
+    /// The binary to disassemble.
     #[structopt(name = "FILE")]
     file: String,
+
+    /// Show statistics about the binary.
+    #[structopt(short, long)]
+    stats: bool,
 }
 
 fn main() {
@@ -38,9 +43,16 @@ fn run() -> io::Result<()> {
         &filename, file_size
     );
 
-    match parse(&buffer) {
-        Err(e) => eprintln!("{:?}", e),
+    match disassemble(&buffer) {
+        Err(e) => {
+            // TODO: this shouldn't be Debug printing
+            eprintln!("{:?}", e)
+        }
         Ok(instrs) => {
+            if opt.stats {
+                show_stats(&instrs);
+            }
+
             for ins in instrs {
                 let bytes_str = ins
                     .to_bytes()
@@ -48,12 +60,63 @@ fn run() -> io::Result<()> {
                     .map(|b| format!("{:02x}", b))
                     .collect::<Vec<_>>()
                     .join(" ");
-                println!("{:02x}: {:8} | {}", ins.addr(), bytes_str, ins);
+                println!(
+                    "{:6} {:8} | {}",
+                    format!("{:02x}:", ins.addr()),
+                    bytes_str,
+                    ins
+                );
             }
         }
     };
 
     Ok(())
+}
+
+/// Prints stats about the analyzed binary.
+fn show_stats(instrs: &[Instruction]) {
+    let sum_up = |f: fn(&Instruction) -> usize| instrs.iter().map(f).sum();
+    let count_instrs = |pred: fn(&&Instruction) -> bool| instrs.iter().filter(pred).count();
+    let percentage = |num: usize, denom: usize| (num as f64 / denom as f64) * 100.0;
+
+    let total_bytes = sum_up(|ins| ins.size());
+    let total_instrs = count_instrs(|ins| !matches!(ins, Label(_, _)));
+    let opcode_bytes: usize = sum_up(|ins| ins.num_opcodes());
+    let operand_bytes: usize = sum_up(|ins| ins.num_operands());
+
+    println!("{} instructions ({} bytes)", total_instrs, total_bytes);
+    println!(
+        "Opcode bytes: {:.2}% ({} bytes)",
+        percentage(opcode_bytes, total_bytes),
+        opcode_bytes
+    );
+    println!(
+        "Operand bytes: {:.2}% ({} bytes)",
+        percentage(operand_bytes, total_bytes),
+        operand_bytes
+    );
+
+    let single_byte_intrs = count_instrs(|ins| ins.size() == 1);
+    let two_byte_intrs = count_instrs(|ins| ins.size() == 2);
+    let three_byte_intrs = count_instrs(|ins| ins.size() == 3);
+
+    println!(
+        "1-byte instructions: {:.2}% ({})",
+        percentage(single_byte_intrs, total_instrs),
+        single_byte_intrs
+    );
+    println!(
+        "2-byte instructions: {:.2}% ({})",
+        percentage(two_byte_intrs, total_instrs),
+        two_byte_intrs
+    );
+    println!(
+        "3-byte instructions: {:.2}% ({})",
+        percentage(three_byte_intrs, total_instrs),
+        three_byte_intrs
+    );
+
+    println!();
 }
 
 static mut GENSYM_COUNTER: usize = 0;
@@ -75,7 +138,7 @@ pub enum Error {
 }
 
 /// Parses a slice of bytes into an assembly program (list of instructions).
-fn parse(bytes: &[u8]) -> Result<Vec<Instruction>, Error> {
+fn disassemble(bytes: &[u8]) -> Result<Vec<Instruction>, Error> {
     let mut bytes = bytes.iter();
     let mut instrs = Vec::new();
 

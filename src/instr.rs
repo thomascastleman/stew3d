@@ -46,6 +46,34 @@ impl Instruction {
             }
         }
     }
+
+    /// Determines the number of bytes to encode this instruction.
+    pub fn size(&self) -> usize {
+        self.to_bytes().len()
+    }
+
+    /// Determines the number of operands in this instruction.
+    pub fn num_operands(&self) -> usize {
+        match self {
+            Label(_, _) => 0,      // labels have no operands
+            Jump(_, _, _, _) => 1, // the jump target
+            Instr(_, _, operands) => match operands {
+                Zero => 0,
+                One(_) => 1,
+                Two(_, _) => 2,
+            },
+        }
+    }
+
+    /// Determines the number of opcodes in this instruction. Really, all
+    /// instructions have 1 opcode, but this ensures that labels don't count
+    /// as having opcodes.
+    pub fn num_opcodes(&self) -> usize {
+        match self {
+            Label(_, _) => 0,
+            _ => 1,
+        }
+    }
 }
 
 /// The tab character that is used to indent instructions in the disassembly.

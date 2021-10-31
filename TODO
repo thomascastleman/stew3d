@@ -2,9 +2,9 @@
 [] use an error handling crate like anyhow
 
 Jobs for the profiler:
-    [] disassembler
-    [] count # of instrs
-    [] count # of immediates
-    [] breakdown % opcodes vs % immediates
-    [] breakdown of % of single-byte instrs, two-byte instrs, etc
+    [x] disassembler
+    [x] count # of instrs
+    [x] count # of immediates
+    [x] breakdown % opcodes vs % immediates
+    [x] breakdown of % of single-byte instrs, two-byte instrs, etc
     [] top 5 most common instrs (or instr sequences?)
