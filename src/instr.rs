@@ -4,20 +4,32 @@ use Instruction::*;
 use Opcode::*;
 use Operands::*;
 
-#[derive(Debug, Clone, Copy)]
+/// Encodes the operands of an instruction. Currently, instructions can have
+/// between 0-2 single-byte operands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operands {
     Zero,
     One(u8),
     Two(u8, u8),
 }
 
-#[derive(Debug, Clone)]
+/// An instruction that has been reconstructed via disassembly. For the purposes
+/// of turning raw addresses in jump instructions into labels, this type is
+/// split into three variants:
+///
+/// - `Label` represents a label that has been inserted by the disassembler.
+/// - `Jump` represents any instruction which requires a jump target.
+/// - `Instr` represents all other instructions.
+///
+/// The first field of each variant is a `usize` address indicating where
+/// in the program the instruction/label occurs.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction {
-    /// address, name
+    /// `Label` contains an address and a name for the label.
     Label(usize, String),
-    /// address, opcode, target address, target label
+    /// `Jump` contains an address, an opcode (of the jump), a target address, and a target label.
     Jump(usize, Opcode, u8, String),
-    /// address, opcode, operands
+    /// `Instr` contains an address, an opcode, and operands.
     Instr(usize, Opcode, Operands),
 }
 

@@ -8,3 +8,4 @@ description = "A disassembler for the Stew 3000"
 [dependencies]
 bimap = "0.6.1"
 structopt = "0.3.25"
+anyhow = "1.0.47"

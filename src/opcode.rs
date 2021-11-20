@@ -1,8 +1,13 @@
 use std::convert::TryFrom;
 
+/// Limits on the range of valid opcodes.
 const OPCODE_MIN: u8 = 0x00;
 const OPCODE_MAX: u8 = 0xc8;
 
+/// This type represents the opcode of a valid instruction in the 3000's
+/// instruction set. Each opcode uniquely identifies a single instruction.
+///
+/// Opcodes are single bytes (`u8`s), which is why this enum is `repr(u8)`.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
@@ -259,26 +264,15 @@ impl TryFrom<u8> for Opcode {
     }
 }
 
-pub enum InstrSize {
-    OneByte,
-    TwoByte,
-    ThreeByte,
-}
-
-impl InstrSize {
-    /// Converts the given instruction size into its actual numeric quantity.
-    pub fn to_number(&self) -> usize {
-        match *self {
-            Self::OneByte => 1,
-            Self::TwoByte => 2,
-            Self::ThreeByte => 3,
-        }
-    }
-}
-
 impl Opcode {
     /// Determines the size of an instruction, given its opcode.
-    pub fn size_of_ins(self) -> Result<InstrSize, crate::Error> {
+    ///
+    /// # Examples
+    /// ```
+    /// let op = HLT;
+    /// assert_eq!(op.instruction_size(), 1);
+    /// ```
+    pub fn instruction_size(self) -> usize {
         match self as u8 {
             // add, addc, sub, subb, and, or, xor, not, neg, inr, inr2, inr3,
             // dcr, dcr2, dcr3, mov, ld, st, cmp, ret, out, dd, hlt, nop
@@ -293,7 +287,7 @@ impl Opcode {
             | 0x82..=0x96
             | 0x9f..=0xaa
             | 0xbd..=0xc0
-            | 0xc4..=0xc8 => Ok(InstrSize::OneByte),
+            | 0xc4..=0xc8 => 1,
 
             // addi, addci, subi, subbi, ani, ori, xri, mvi, lds, sts, cmpi,
             // jmp, je, jne, jg, jge, jl, jle, ja, jae, jb, jbe, call, outi,
@@ -308,12 +302,13 @@ impl Opcode {
             | 0x7f..=0x81
             | 0x97..=0x9d
             | 0xab..=0xbc
-            | 0xc1..=0xc3 => Ok(InstrSize::TwoByte),
+            | 0xc1..=0xc3 => 2,
 
             // stsi
-            0x9e => Ok(InstrSize::ThreeByte),
+            0x9e => 3,
 
-            opcode => Err(crate::Error::InvalidOpcode(opcode)),
+            // It should not be possible for something of type Opcode to encode an invalid opcode
+            opcode => panic!("called instruction_size on invalid opcode: {}", opcode),
         }
     }
 }
