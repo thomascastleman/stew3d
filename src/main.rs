@@ -3,6 +3,7 @@ use bimap::BiMap;
 use instr::Instruction::{self, *};
 use instr::Operands::*;
 use opcode::Opcode::{self, *};
+use stats::BinaryStats;
 use std::convert::TryInto;
 use std::fmt;
 use std::fs::File;
@@ -11,6 +12,7 @@ use structopt::StructOpt;
 
 mod instr;
 mod opcode;
+mod stats;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "stew3d")]
@@ -42,16 +44,16 @@ fn run() -> Result<()> {
         Some(ref filename) => File::open(&filename)?.read_to_end(&mut buffer)?,
     };
 
+    let instrs = disassemble(&buffer)?;
+
     println!(
         "\nDisassembly of file `{}` ({} bytes)\n",
         &opt.file.unwrap_or_else(|| "stdin".into()),
         bytes_read
     );
 
-    let instrs = disassemble(&buffer)?;
-
     if opt.stats {
-        show_stats(&instrs);
+        println!("{}", BinaryStats::new(&instrs));
     }
 
     for ins in instrs {
@@ -72,74 +74,26 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-/// Prints stats about the analyzed binary.
-fn show_stats(instrs: &[Instruction]) {
-    let sum_up = |f: fn(&Instruction) -> usize| instrs.iter().map(f).sum();
-    let count_instrs = |pred: fn(&&Instruction) -> bool| instrs.iter().filter(pred).count();
-    let percentage = |num: usize, denom: usize| (num as f64 / denom as f64) * 100.0;
-
-    let total_bytes = sum_up(|ins| ins.size());
-    let total_instrs = count_instrs(|ins| !matches!(ins, Label(_, _)));
-    let opcode_bytes: usize = sum_up(|ins| ins.num_opcodes());
-    let operand_bytes: usize = sum_up(|ins| ins.num_operands());
-
-    println!("{} instructions ({} bytes)", total_instrs, total_bytes);
-    println!(
-        "Opcode bytes: {:.2}% ({} bytes)",
-        percentage(opcode_bytes, total_bytes),
-        opcode_bytes
-    );
-    println!(
-        "Operand bytes: {:.2}% ({} bytes)",
-        percentage(operand_bytes, total_bytes),
-        operand_bytes
-    );
-
-    let single_byte_intrs = count_instrs(|ins| ins.size() == 1);
-    let two_byte_intrs = count_instrs(|ins| ins.size() == 2);
-    let three_byte_intrs = count_instrs(|ins| ins.size() == 3);
-
-    println!(
-        "1-byte instructions: {:.2}% ({})",
-        percentage(single_byte_intrs, total_instrs),
-        single_byte_intrs
-    );
-    println!(
-        "2-byte instructions: {:.2}% ({})",
-        percentage(two_byte_intrs, total_instrs),
-        two_byte_intrs
-    );
-    println!(
-        "3-byte instructions: {:.2}% ({})",
-        percentage(three_byte_intrs, total_instrs),
-        three_byte_intrs
-    );
-
-    println!();
-}
-
-static mut GENSYM_COUNTER: usize = 0;
-
-/// Generates a unique name, given a basename.
-fn gensym(base: &str) -> String {
-    // SAFETY: There is only one thread which accesses GENSYM_COUNTER.
-    let name = format!("{}{}", base, unsafe { GENSYM_COUNTER });
-    unsafe {
-        GENSYM_COUNTER += 1;
-    }
-    name
-}
-
+/// Represents possible errors that can occur while disassembling. `InvalidOpcode`
+/// indicates an opcode outside the valid range was encountered. `UnexpectedEndOfFile`
+/// indicates we were in the middle of parsing the operands for an instruction,
+/// but encountered the end of input before all the operands were provided.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Error {
-    InvalidOpcode(u8),
+    InvalidOpcode(u8, usize),
     UnexpectedEndOfFile(Opcode),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidOpcode(opcode) => write!(f, "invalid opcode encountered: `{:x}`", opcode),
+            Self::InvalidOpcode(opcode, addr) => {
+                write!(
+                    f,
+                    "invalid opcode encountered at byte {}: `{:x}`",
+                    addr, opcode
+                )
+            }
             Self::UnexpectedEndOfFile(opcode) => write!(
                 f,
                 "unexpected end of file while processing instruction with opcode {:02x}",
@@ -166,13 +120,23 @@ fn disassemble(bytes: &[u8]) -> Result<Vec<Instruction>, Error> {
     let mut bytes = bytes.iter();
     let mut instrs = Vec::new();
 
+    // Gensym is used to generate unique label names
+    let mut gensym_counter: usize = 0;
+    let mut gensym = move |base: &str| -> String {
+        gensym_counter += 1;
+        format!("{}{}", base, gensym_counter - 1)
+    };
+
     // This map maintains a bidirectional correspondence between addresses and labels
     let mut label_addr_map: BiMap<usize, String> = BiMap::new();
 
     let mut addr = 0; // current address in binary
 
     while let Some(&opcode) = bytes.next() {
-        let opcode: Opcode = opcode.try_into()?;
+        let opcode: Opcode = match opcode.try_into() {
+            Ok(opcode) => opcode,
+            Err(_) => return Err(Error::InvalidOpcode(opcode, addr)),
+        };
         let size = opcode.instruction_size();
 
         // Expect another byte in the input stream and error with unexpected
@@ -263,7 +227,7 @@ mod test {
     fn errs_on_invalid_opcode() {
         // df is above OPCODE_MAX
         let b = [0x80, 0x05, 0xc5, 0xdf, 0xc7];
-        assert_eq!(disassemble(&b), Err(Error::InvalidOpcode(0xdf)));
+        assert_eq!(disassemble(&b), Err(Error::InvalidOpcode(0xdf, 3)));
     }
 
     #[test]

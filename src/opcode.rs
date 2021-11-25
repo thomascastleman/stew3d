@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt;
 
 /// Limits on the range of valid opcodes.
 const OPCODE_MIN: u8 = 0x00;
@@ -250,8 +251,20 @@ pub enum Opcode {
     NOP = OPCODE_MAX,
 }
 
+/// Represents a failure to convert a given `u8` into an `Opcode`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct ConversionFailure(u8);
+
+impl fmt::Display for ConversionFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "cannot convert byte {:02x} to opcode", self.0)
+    }
+}
+
+impl std::error::Error for ConversionFailure {}
+
 impl TryFrom<u8> for Opcode {
-    type Error = crate::Error;
+    type Error = ConversionFailure;
 
     fn try_from(byte: u8) -> Result<Self, Self::Error> {
         match byte {
@@ -259,7 +272,7 @@ impl TryFrom<u8> for Opcode {
                 // SAFETY: The byte is within the valid range of opcodes.
                 Ok(unsafe { std::mem::transmute(byte) })
             }
-            _ => Err(crate::Error::InvalidOpcode(byte)),
+            _ => Err(ConversionFailure(byte)),
         }
     }
 }
@@ -310,5 +323,27 @@ impl Opcode {
             // It should not be possible for something of type Opcode to encode an invalid opcode
             opcode => panic!("called instruction_size on invalid opcode: {}", opcode),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use Opcode::*;
+
+    #[test]
+    fn instruction_sizes() {
+        assert_eq!(CALL.instruction_size(), 2);
+        assert_eq!(MOV_A_C.instruction_size(), 1);
+        assert_eq!(STSI.instruction_size(), 3);
+        assert_eq!(OUTI.instruction_size(), 2);
+    }
+
+    #[test]
+    fn conversions() {
+        assert_eq!(Opcode::try_from(0x00), Ok(ADD_A_A));
+        assert_eq!(Opcode::try_from(0xc8), Ok(NOP));
+        assert_eq!(Opcode::try_from(0x55), Ok(NOT_A));
+        assert!(Opcode::try_from(0xc9).is_err());
     }
 }
