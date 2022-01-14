@@ -1,6 +1,6 @@
 [package]
 name = "stew3d"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
 authors = ["Thomas Castleman <thomascastleman0@gmail.com>"]
 description = "A disassembler for the Stew 3000"

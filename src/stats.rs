@@ -6,6 +6,7 @@ use std::fmt;
 ///   - Size of program (bytes)
 ///   - Breakdown of bytes between opcodes/operands
 ///   - Breakdown of one-/two-/three-byte instructions
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct BinaryStats {
     total_instrs: usize,
     total_bytes: usize,
@@ -23,8 +24,8 @@ impl BinaryStats {
         let count_instrs = |pred: fn(&&Instruction) -> bool| instrs.iter().filter(pred).count();
 
         BinaryStats {
-            total_instrs: sum_up(|ins| ins.size()),
-            total_bytes: count_instrs(|ins| !matches!(ins, Label(_, _))),
+            total_instrs: count_instrs(|ins| !matches!(ins, Label(_, _))),
+            total_bytes: sum_up(|ins| ins.size()),
             opcode_bytes: sum_up(|ins| ins.num_opcodes()),
             operand_bytes: sum_up(|ins| ins.num_operands()),
             single_byte_instrs: count_instrs(|ins| ins.size() == 1),
@@ -71,5 +72,61 @@ impl fmt::Display for BinaryStats {
             self.three_byte_instrs,
             percentage(self.three_byte_instrs, self.total_instrs),
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::instr::Operands::*;
+    use crate::opcode::Opcode::*;
+
+    #[test]
+    fn small_program() {
+        // 00:    7f ff    |   mvi 255, a
+        // 02:             | l0:
+        // 02:    be       |   out a
+        // 03:    67       |   dcr a
+        // 04:    a1       |   cmp a, z
+        // 05:    b3 02    |   jne l0
+        let bytes = [
+            Instr(0x00, MVI_A, One(0xff)),
+            Label(0x02, "l0".into()),
+            Instr(0x02, OUT_A, Zero),
+            Instr(0x03, DCR_A, Zero),
+            Instr(0x04, CMP_A_Z, Zero),
+            Jump(0x05, JNE, 0x02, "l0".into()),
+        ];
+
+        let stats = BinaryStats::new(&bytes[..]);
+        assert_eq!(
+            stats,
+            BinaryStats {
+                total_instrs: 5,
+                total_bytes: 7,
+                opcode_bytes: 5,
+                operand_bytes: 2,
+                single_byte_instrs: 3,
+                two_byte_instrs: 2,
+                three_byte_instrs: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn empty() {
+        let stats = BinaryStats::new(&[]);
+        assert_eq!(
+            stats,
+            BinaryStats {
+                total_instrs: 0,
+                total_bytes: 0,
+                opcode_bytes: 0,
+                operand_bytes: 0,
+                single_byte_instrs: 0,
+                two_byte_instrs: 0,
+                three_byte_instrs: 0,
+            }
+        );
     }
 }
